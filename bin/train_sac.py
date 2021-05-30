@@ -9,28 +9,37 @@ from gym import wrappers
 from gym_unity.envs import UnityToGymWrapper
 from mlagents_envs.environment import UnityEnvironment
 import argparse
+import time
+from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--proj", help="wandb project", required=True,
-                        type=str)
+                        type=str, action='store', nargs='?')
     parser.add_argument("--name", help="wandb experiment name", required=True,
-                        type=str)
-    parser.add_argument("--entity", help="wandb entity name",
-                        type=str)
+                        type=str, action='store', nargs='?')
+    parser.add_argument("--entity", help="wandb entity name", option
+                        type=str, action='store', nargs='?')
     parser.add_argument("--epochs", help="epochs", default=250,
                         type=int)
     parser.add_argument("--seed", help="seed", 
                         type=int, default=42)
+    parser.add_argument("--save", help="save frequency", 
+                        type=int, default=50)
+    parser.add_argument("--ff", help="fast forward simulation", 
+                        type=int, default=20)
+    parser.add_argument("--wandb")
 
     args = parser.parse_args()
     SEED = args.seed
     set_seed_everywhere(SEED)
 
     # Environment
+    channel = EngineConfigurationChannel()
+    channel.set_configuration_parameters(time_scale = args.ff)
     environment_name = 'RL_Simulatorv2'
-    unity_env = UnityEnvironment('./unity_environments/RL_Simulatorv2/RL_Simulatorv2')
+    unity_env = UnityEnvironment('./unity_environments/RL_Simulatorv2/RL_Simulatorv2', side_channels=[channel])
     env = UnityToGymWrapper(unity_env)
 
     action_dim = env.action_space.shape[0]
@@ -47,18 +56,19 @@ if __name__ == '__main__':
     score_history = []
     load_checkpoint = False
 
-
     # Logger
-    LOGGER = WandbLogger(
-                project=args.proj,
-                name=args.name,
-                entity=args.entity
-            )
+    if args.wandb:
+        LOGGER = WandbLogger(
+                    project=args.proj,
+                    name=args.name,
+                    entity=args.entity
+                )
 
     if load_checkpoint:
         agent.load_models()
         env.render(mode='human')
 
+    start_time = time.time()
     for i in range(n_games):
         observation = env.reset()
         done = False
@@ -83,19 +93,25 @@ if __name__ == '__main__':
         score_history.append(score)
         avg_score = np.mean(score_history[-100:])
 
-        LOGGER.plot_metrics('avg_reward', avg_score)
-        LOGGER.plot_metrics('reward', score_history),
-        LOGGER.plot_epoch_loss('policy_epoch_loss_ave', policy_losses)
-        LOGGER.plot_epoch_loss('value_epoch_loss_ave', value_losses)
-        LOGGER.plot_epoch_loss('q1_epoch_loss_ave', q1_losses)
-        LOGGER.plot_epoch_loss('q2_epoch_loss_ave', q2_losses)
+        if args.wandb:
+            LOGGER.plot_metrics('avg_reward', avg_score)
+            LOGGER.plot_metrics('reward', score_history),
+            LOGGER.plot_epoch_loss('policy_epoch_loss_ave', policy_losses)
+            LOGGER.plot_epoch_loss('value_epoch_loss_ave', value_losses)
+            LOGGER.plot_epoch_loss('q1_epoch_loss_ave', q1_losses)
+            LOGGER.plot_epoch_loss('q2_epoch_loss_ave', q2_losses)
 
-        if avg_score > best_score:
+        current_time = time.time()
+        elapsed_time = start_time - current_time
+        remaining_time = (elapsed_time / (i + 1)) * (n_games - (i + 1))
+
+        if i > 0 and i % args.save == 0 and avg_score > best_score:
             best_score = avg_score
             if not load_checkpoint:
                 agent.save_models()
-
-        print('episode ', i, 'score %.1f' % score, 'avg_score %.1f' % avg_score)
+        print("Elapsed time: ", elapsed_time)
+        print('Episode ', i, 'score %.1f' % score, 'avg_score %.1f' % avg_score)
+        print(f'Remaining_time: {remaining_time}s')
 
     if not load_checkpoint:
         x = [i+1 for i in range(n_games)]
