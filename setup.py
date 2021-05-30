@@ -22,6 +22,8 @@ setup(
         "mpi4py~=3.0.3",
         "mujoco-py~=1.50.1.68",
         "matplotlib~=3.3.4",
-        "wandb~=0.10.31"
+        "wandb~=0.10.31",
+        "gdown~=3.13",
+        "numpy~=1.16.4"
     ],
 )
