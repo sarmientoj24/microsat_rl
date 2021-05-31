@@ -11,12 +11,12 @@ import numpy as np
 '''
 class PolicyNetwork(nn.Module):
     def __init__(self, alpha, num_inputs, n_actions, max_action=1, hidden_size=256, 
-            init_w=3e-3, name='policy', chkpt_dir='tmp/sac'):
+            init_w=3e-3, name='policy', chkpt_dir='tmp/', method='sac'):
         super(PolicyNetwork, self).__init__()
 
         self.name = name
-        self.checkpoint_dir = chkpt_dir
-        self.checkpoint_file = os.path.join(self.checkpoint_dir, name+'_sac')
+        self.checkpoint_dir = chkpt_dir + method
+        self.checkpoint_file = os.path.join(self.checkpoint_dir, name + '_' + method)
         
         self.fc1 = nn.Linear(num_inputs, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)

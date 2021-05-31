@@ -3,7 +3,7 @@ import numpy as np
 import random
 import torch
 import pybullet_envs
-from src.sac import Agent
+from src.sac_v2 import Agent
 from src.commons import plot_learning_curve, NormalizedActions, set_seed_everywhere, WandbLogger
 from gym import wrappers
 from gym_unity.envs import UnityToGymWrapper
@@ -32,8 +32,6 @@ if __name__ == '__main__':
     parser.add_argument("--wandb")
 
     args = parser.parse_args()
-
-    # Seeding
     SEED = args.seed
     set_seed_everywhere(SEED)
 
@@ -47,9 +45,15 @@ if __name__ == '__main__':
     action_dim = env.action_space.shape[0]
     state_dim  = 50
 
+    print(action_dim)
+
     agent = Agent(num_inputs=state_dim, env=env,
             n_actions=action_dim, max_action=1)
+
+    # hyperparameters
     n_games = args.epochs
+    batch_size = 256
+    auto_entropy = True
 
     filename = f'{environment_name}.png'
     figure_file = 'plots/' + filename
@@ -76,18 +80,22 @@ if __name__ == '__main__':
         done = False
         score = 0
 
-        policy_losses, value_losses, q1_losses, q2_losses = [], [], [], []
+        epoch_time = time.time()
+        policy_losses, q1_losses, q2_losses = [], [], []
         while not done:
             action = agent.choose_action(observation)
             observation_, reward, done, info = env.step(action)
             score += reward
             agent.remember(observation, action, reward, observation_, done)
             if not load_checkpoint and agent.memory.mem_cntr > agent.batch_size:
-                v_, q1_, q2_, p_ = agent.learn(debug=False)
+                q1_, q2_, p_ = agent.learn(
+                    auto_entropy=auto_entropy, 
+                    target_entropy=-1.*action_dim,
+                    debug=False
+                )
 
                 # Log losses
                 policy_losses.append(p_.detach().cpu().numpy())
-                value_losses.append(v_.detach().cpu().numpy())
                 q1_losses.append(q1_.detach().cpu().numpy())
                 q2_losses.append(q2_.detach().cpu().numpy())
 
@@ -99,7 +107,6 @@ if __name__ == '__main__':
             LOGGER.plot_metrics('avg_reward', avg_score)
             LOGGER.plot_metrics('reward', score_history),
             LOGGER.plot_epoch_loss('policy_epoch_loss_ave', policy_losses)
-            LOGGER.plot_epoch_loss('value_epoch_loss_ave', value_losses)
             LOGGER.plot_epoch_loss('q1_epoch_loss_ave', q1_losses)
             LOGGER.plot_epoch_loss('q2_epoch_loss_ave', q2_losses)
 
@@ -112,6 +119,7 @@ if __name__ == '__main__':
             if not load_checkpoint:
                 agent.save_models()
         print("Elapsed time: ", elapsed_time)
+        print("Epoch time: ", time.time() - epoch_time)
         print('Episode ', i, 'score %.1f' % score, 'avg_score %.1f' % avg_score)
         print(f'Remaining_time: {remaining_time}s')
 
