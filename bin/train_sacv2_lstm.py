@@ -2,7 +2,7 @@ import gym
 import numpy as np
 import random
 import torch
-from src.sac import Agent
+from src.sac_v2_lstm import Agent
 from src.commons import plot_learning_curve, NormalizedActions, set_seed_everywhere, WandbLogger
 from gym import wrappers
 from gym_unity.envs import UnityToGymWrapper
@@ -31,8 +31,6 @@ if __name__ == '__main__':
     parser.add_argument("--wandb")
 
     args = parser.parse_args()
-
-    # Seeding
     SEED = args.seed
     set_seed_everywhere(SEED)
 
@@ -49,15 +47,17 @@ if __name__ == '__main__':
     state_dim  = 50
 
     # Method
-    method = 'sac'
-
-    # Hyper parameters
+    method = 'sac_v2_lstm'
+    
+    # hyperparameters
     n_games = args.epochs
     batch_size = 512
     hidden_dim = 128
+    auto_entropy = True
+    deterministic = False
     reward_scale = 10.
 
-    agent = Agent(state_dim=state_dim, env=env, batch_size=512, hidden_dim=128,
+    agent = Agent(state_dim=state_dim, env=env, hidden_dim=hidden_dim,
             action_dim=action_dim, action_range=1, reward_scale=reward_scale)
 
     filename = f'{method}_{environment_name}.png'
@@ -85,23 +85,58 @@ if __name__ == '__main__':
         done = False
         score = 0
 
+        # Replay Buffer containers
+        last_action = env.action_space.sample()
+        episode_state = []
+        episode_action = []
+        episode_last_action = []
+        episode_reward = []
+        episode_next_state = []
+        episode_done = []
+
+        hidden_out = (torch.zeros([1, 1, hidden_dim], dtype=torch.float).to('cpu'), \
+                torch.zeros([1, 1, hidden_dim], dtype=torch.float).to('cpu'))
+
+        # Logging variables
         epoch_time = time.time()
-        policy_losses, value_losses, q1_losses, q2_losses = [], [], [], []
+        policy_losses, q1_losses, q2_losses = [], [], []
+
+        step = 0
         while not done:
-            action = agent.choose_action(observation)
+            hidden_in = hidden_out
+            action, hidden_out = agent.choose_action(observation, last_action, hidden_in, deterministic=deterministic)
             observation_, reward, done, info = env.step(action)
+            
             score += reward
-            agent.remember(observation, action, reward, observation_, done)
-            if not load_checkpoint and agent.memory.mem_cntr > agent.batch_size:
-                v_, q1_, q2_, p_ = agent.learn(debug=False)
+
+            if step == 0:
+                ini_hidden_in = hidden_in
+                ini_hidden_out = hidden_out
+            episode_state.append(observation)
+            episode_action.append(action)
+            episode_last_action.append(last_action)
+            episode_reward.append(reward)
+            episode_next_state.append(observation_)
+            episode_done.append(done)
+
+            observation = observation_
+            last_action = action
+
+            if not load_checkpoint and len(agent.memory.buffer) > agent.batch_size:
+                q1_, q2_, p_ = agent.learn(
+                    auto_entropy=auto_entropy, 
+                    target_entropy=-1.*action_dim,
+                    debug=False
+                )
 
                 # Log losses
                 policy_losses.append(p_.detach().cpu().numpy())
-                value_losses.append(v_.detach().cpu().numpy())
                 q1_losses.append(q1_.detach().cpu().numpy())
                 q2_losses.append(q2_.detach().cpu().numpy())
 
-            observation = observation_
+            step += 1
+        agent.remember(ini_hidden_in, ini_hidden_out, episode_state, episode_action, episode_last_action, \
+                episode_reward, episode_next_state, episode_done)
         score_history.append(score)
         avg_score = np.mean(score_history[-100:])
 
@@ -109,7 +144,6 @@ if __name__ == '__main__':
             LOGGER.plot_metrics('avg_reward', avg_score)
             LOGGER.plot_metrics('reward', score_history),
             LOGGER.plot_epoch_loss('policy_epoch_loss_ave', policy_losses)
-            LOGGER.plot_epoch_loss('value_epoch_loss_ave', value_losses)
             LOGGER.plot_epoch_loss('q1_epoch_loss_ave', q1_losses)
             LOGGER.plot_epoch_loss('q2_epoch_loss_ave', q2_losses)
 

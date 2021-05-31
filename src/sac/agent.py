@@ -5,29 +5,28 @@ import torch.nn.functional as F
 import numpy as np
 
 class Agent():
-    def __init__(self, alpha=0.0003, beta=0.0003, num_inputs=4,
-            env=None, gamma=0.99, n_actions=4, max_action=1, max_size=1000000, tau=1e-2,
-            hidden_dim=256, batch_size=256, reward_scale=1):
+    def __init__(self, alpha=0.0001, state_dim=50, env=None, gamma=0.995,
+            action_dim=4, action_range=1, max_size=1000000, tau=1e-2,
+            hidden_dim=128, batch_size=512, reward_scale=1):
         self.gamma = gamma
         self.tau = tau
         self.alpha = alpha
-        self.beta = beta
-        self.memory = ReplayBuffer(max_size, num_inputs, n_actions)
+        self.memory = ReplayBuffer(max_size, state_dim, action_dim)
         self.batch_size = batch_size
-        self.n_actions = n_actions
+        self.action_dim = action_dim
 
-        self.policy_net = PolicyNetwork(alpha, num_inputs, n_actions=n_actions,
-                    name='policy_net', max_action=max_action)
-        self.soft_q_net1 = SoftQNetwork(beta, num_inputs, n_actions=n_actions,
+        self.policy_net = PolicyNetwork(alpha, state_dim, action_dim=action_dim,
+                    name='policy_net', action_range=action_range)
+        self.soft_q_net1 = SoftQNetwork(alpha, state_dim, action_dim=action_dim,
                     name='soft_q_net1')
-        self.soft_q_net2 = SoftQNetwork(beta, num_inputs, n_actions=n_actions,
+        self.soft_q_net2 = SoftQNetwork(alpha, state_dim, action_dim=action_dim,
                     name='soft_q_net2')
-        self.value_net = ValueNetwork(beta, num_inputs, name='value')
-        self.target_value_net = ValueNetwork(beta, num_inputs, name='target_value')
+        self.value_net = ValueNetwork(alpha, state_dim, name='value')
+        self.target_value_net = ValueNetwork(alpha, state_dim, name='target_value')
 
         self.reward_scale = reward_scale
         self.update_network_parameters(tau=1)
-        self.action_range = max_action
+        self.action_range = action_range
 
     def choose_action(self, state, deterministic=False):
         if self.memory.mem_cntr < self.batch_size:
@@ -87,7 +86,7 @@ class Agent():
         predicted_value    = self.value_net(state)
         new_action, log_prob = self.policy_net.sample_normal(state)
 
-        reward = self.reward_scale*(reward - reward.mean(dim=0)) /reward.std(dim=0) # normalize with batch mean and std
+        reward = self.reward_scale*(reward - reward.mean(dim=0)) / (reward.std(dim=0) +  + 1e-6) # normalize with batch mean and std
         # Training Q Function
         target_value = self.target_value_net(next_state)
         target_q_value = reward + (1 - done) * self.gamma * target_value # if done==1, only reward

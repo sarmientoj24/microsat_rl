@@ -2,7 +2,6 @@ import gym
 import numpy as np
 import random
 import torch
-import pybullet_envs
 from src.sac_v2 import Agent
 from src.commons import plot_learning_curve, NormalizedActions, set_seed_everywhere, WandbLogger
 from gym import wrappers
@@ -39,23 +38,32 @@ if __name__ == '__main__':
     channel = EngineConfigurationChannel()
     channel.set_configuration_parameters(time_scale = args.ff)
     environment_name = 'RL_Simulator_paper_nographics'
-    unity_env = UnityEnvironment('./unity_environments/RL_Simulator_paper_nographics/RL_Simulator_paper_nographics', side_channels=[channel])
+    unity_env = UnityEnvironment(
+        './unity_environments/RL_Simulator_paper_nographics/RL_Simulator_paper_nographics', 
+        side_channels=[channel], no_graphics=True, seed=SEED)
+        # no_graphics=True,
+        # base_port=5100,
+        # worker_id=1)
     env = UnityToGymWrapper(unity_env)
 
     action_dim = env.action_space.shape[0]
     state_dim  = 50
 
-    print(action_dim)
+    # Method
+    method = 'sac_v2'
 
-    agent = Agent(num_inputs=state_dim, env=env,
-            n_actions=action_dim, max_action=1)
-
-    # hyperparameters
+    # Hyper parameters
     n_games = args.epochs
-    batch_size = 256
+    batch_size = 512
+    hidden_dim = 128
+    deterministic = False
+    reward_scale = 1.
     auto_entropy = True
 
-    filename = f'{environment_name}.png'
+    agent = Agent(state_dim=state_dim, env=env, batch_size=512, hidden_dim=128,
+            action_dim=action_dim, action_range=1, reward_scale=reward_scale)
+
+    filename = f'{method}_{environment_name}.png'
     figure_file = 'plots/' + filename
 
     best_score = env.reward_range[0]

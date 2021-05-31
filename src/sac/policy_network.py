@@ -10,30 +10,30 @@ import numpy as np
     This is also called the Actor-Network
 '''
 class PolicyNetwork(nn.Module):
-    def __init__(self, alpha, num_inputs, n_actions, max_action=1, hidden_size=256, 
-            init_w=3e-3, name='policy', chkpt_dir='tmp/', method='sac'):
+    def __init__(self, alpha=0.0001, state_dim=50, action_dim=4, action_range=1, 
+            hidden_size=256, init_w=3e-3, name='policy', chkpt_dir='tmp/', method='sac'):
         super(PolicyNetwork, self).__init__()
 
         self.name = name
         self.checkpoint_dir = chkpt_dir + method
         self.checkpoint_file = os.path.join(self.checkpoint_dir, name + '_' + method)
         
-        self.fc1 = nn.Linear(num_inputs, hidden_size)
+        self.fc1 = nn.Linear(state_dim, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, hidden_size)
         self.fc4 = nn.Linear(hidden_size, hidden_size)
 
-        self.mu = nn.Linear(hidden_size, n_actions)
+        self.mu = nn.Linear(hidden_size, action_dim)
         self.mu.weight.data.uniform_(-init_w, init_w)
         self.mu.bias.data.uniform_(-init_w, init_w)
         
-        self.sigma = nn.Linear(hidden_size, n_actions)
+        self.sigma = nn.Linear(hidden_size, action_dim)
         self.sigma.weight.data.uniform_(-init_w, init_w)
         self.sigma.bias.data.uniform_(-init_w, init_w)
 
         # Range of 4 actions are already normalized [-1, 1]
-        self.action_range = max_action
-        self.n_actions = n_actions
+        self.action_range = action_range
+        self.action_dim = action_dim
         self.reparam_noise = 1e-6
 
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
@@ -93,5 +93,5 @@ class PolicyNetwork(nn.Module):
         return action
 
     def sample_action(self):
-        action = T.FloatTensor(self.n_actions).uniform_(-1, 1)
+        action = T.FloatTensor(self.action_dim).uniform_(-1, 1)
         return (self.action_range * action).numpy()

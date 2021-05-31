@@ -6,11 +6,11 @@ import torch.optim as optim
 
 
 class SoftQNetwork(nn.Module):
-    def __init__(self, beta,  num_inputs, n_actions=4, hidden_size=256, init_w=3e-3, 
+    def __init__(self, alpha=0.0001,  state_dim=50, action_dim=4, hidden_size=128, init_w=3e-3, 
             name='critic', chkpt_dir='./tmp/', method='sac'):
         super(SoftQNetwork, self).__init__()
         
-        self.fc1 = nn.Linear(num_inputs + n_actions, hidden_size)
+        self.fc1 = nn.Linear(state_dim + action_dim, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.q = nn.Linear(hidden_size, 1)
         
@@ -21,7 +21,7 @@ class SoftQNetwork(nn.Module):
         self.checkpoint_dir = chkpt_dir + method
         self.checkpoint_file = os.path.join(self.checkpoint_dir, name + '_' + method)
 
-        self.optimizer = optim.Adam(self.parameters(), lr=beta)
+        self.optimizer = optim.Adam(self.parameters(), lr=alpha)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
 
         self.to(self.device)

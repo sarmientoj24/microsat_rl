@@ -6,7 +6,7 @@ import torch.optim as optim
 
 
 class ValueNetwork(nn.Module):
-    def __init__(self, beta, state_dim, hidden_size=256, init_w=3e-3, 
+    def __init__(self, alpha=0.0001, state_dim=50, hidden_size=128, init_w=3e-3, 
             name='value', chkpt_dir='./tmp/', method='sac'):
         super(ValueNetwork, self).__init__()
         
@@ -21,7 +21,7 @@ class ValueNetwork(nn.Module):
         self.checkpoint_dir = chkpt_dir + method
         self.checkpoint_file = os.path.join(self.checkpoint_dir, name + '_' + method)
 
-        self.optimizer = optim.Adam(self.parameters(), lr=beta)
+        self.optimizer = optim.Adam(self.parameters(), lr=alpha)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
 
         self.to(self.device)
