@@ -7,13 +7,13 @@ import torch.optim as optim
 
 
 class SoftQNetwork(nn.Module):
-    def __init__(self, beta, input_dims, fc1_dims, fc2_dims, n_actions, name,
+    def __init__(self, alpha, input_dims, fc1_dims, fc2_dims, action_dim, name,
                 checkpoint_dir='tmp/ddpg'):
         super(SoftQNetwork, self).__init__()
         self.input_dims = input_dims
         self.fc1_dims = fc1_dims
         self.fc2_dims = fc2_dims
-        self.n_actions = n_actions
+        self.action_dim = action_dim
         self.checkpoint_file = os.path.join(checkpoint_dir, name + '_ddpg')
 
         # Initialize Network
@@ -31,13 +31,13 @@ class SoftQNetwork(nn.Module):
         torch.nn.init.uniform_(self.fc2.weight.data, -f2, f2)
         self.bn2 = nn.LayerNorm(self.f2_dims)
 
-        self.action_value = nn.Linear(self.n_actions, self.fc2_dims)
+        self.action_value = nn.Linear(self.action_dim, self.fc2_dims)
         f3 = 0.003
         self.q = nn.Linear(self.fc2_dims, 1)
         torch.nn.init.uniform_(self.fc3.weight.data, -f3, f3)
         torch.nn.init.uniform_(self.fc3.weight.data, -f3, f3)
 
-        self.optimizer = optim.Adam(self.parameters(), lr=beta)
+        self.optimizer = optim.Adam(self.parameters(), lr=alpha)
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cuda:1')
 
         self.to(self.device)

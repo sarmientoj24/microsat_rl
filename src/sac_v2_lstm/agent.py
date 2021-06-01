@@ -98,16 +98,15 @@ class Agent():
     def learn(self, debug=False, auto_entropy=True, target_entropy=-2):
         hidden_in, hidden_out, state, action, last_action, reward, next_state, done = self.memory.sample_buffer(self.batch_size)
 
-        # print(type(reward), len(reward), reward)
         reward = T.tensor(reward, dtype=T.float).unsqueeze(-1).to(self.policy_net.device)
         done = T.tensor(np.float32(done)).unsqueeze(-1).to(self.policy_net.device)
-        next_state = T.tensor(new_state, dtype=T.float).to(self.policy_net.device)
+        next_state = T.tensor(next_state, dtype=T.float).to(self.policy_net.device)
         state = T.tensor(state, dtype=T.float).to(self.policy_net.device)
         action = T.tensor(action, dtype=T.float).to(self.policy_net.device)
         last_action = T.tensor(last_action, dtype=T.float).to(self.policy_net.device)
 
-        predicted_q_value1 = self.soft_q_net1(state, action, last_action, hidden_in)
-        predicted_q_value2 = self.soft_q_net2(state, action, last_action, hidden_in)
+        predicted_q_value1, _ = self.soft_q_net1(state, action, last_action, hidden_in)
+        predicted_q_value2, _ = self.soft_q_net2(state, action, last_action, hidden_in)
         new_action, log_prob = self.policy_net.sample_normal(state, last_action, hidden_in)
         new_next_action, next_log_prob = self.policy_net.sample_normal(next_state, action, hidden_out)
 

@@ -12,6 +12,7 @@ class ValueNetwork(nn.Module):
         
         self.fc1 = nn.Linear(state_dim, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, hidden_size)
         self.q = nn.Linear(hidden_size, 1)
         # weights initialization
         self.q.weight.data.uniform_(-init_w, init_w)
@@ -29,6 +30,7 @@ class ValueNetwork(nn.Module):
     def forward(self, state):
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         x = self.q(x)
         return x
 

@@ -57,7 +57,7 @@ if __name__ == '__main__':
     deterministic = False
     reward_scale = 10.
 
-    agent = Agent(state_dim=state_dim, env=env, hidden_dim=hidden_dim,
+    agent = Agent(state_dim=state_dim, env=env, batch_size = batch_size, hidden_dim=hidden_dim,
             action_dim=action_dim, action_range=1, reward_scale=reward_scale)
 
     filename = f'{method}_{environment_name}.png'

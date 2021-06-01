@@ -12,6 +12,7 @@ class SoftQNetwork(nn.Module):
         
         self.fc1 = nn.Linear(state_dim + action_dim, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, hidden_size)
         self.q = nn.Linear(hidden_size, 1)
         
         self.q.weight.data.uniform_(-init_w, init_w)
@@ -30,6 +31,7 @@ class SoftQNetwork(nn.Module):
         x = T.cat([state, action], 1) # the dim 0 is number of samples
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         x = self.q(x)
         return x
 

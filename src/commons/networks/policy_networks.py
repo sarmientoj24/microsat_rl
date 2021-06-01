@@ -45,6 +45,7 @@ class PolicyNetworkBase(nn.Module):
 
 class SAC_PolicyNetwork(PolicyNetworkBase):
     def __init__(self, alpha=0.0001, state_dim=50, action_dim=4, action_range=1, 
+            log_std_min=-20, log_std_max=2, 
             name='policy', chkpt_dir='tmp/', method='', init_w=3e-3, param_noise=1e-6):
         super().__init__(state_dim=state_dim, action_dim=action_dim, name=name, method=method)
         
@@ -56,15 +57,17 @@ class SAC_PolicyNetwork(PolicyNetworkBase):
         self.mu.weight.data.uniform_(-init_w, init_w)
         self.mu.bias.data.uniform_(-init_w, init_w)
         
-        self.sigma = nn.Linear(hidden_size, self.action_dim)
-        self.sigma.weight.data.uniform_(-init_w, init_w)
-        self.sigma.bias.data.uniform_(-init_w, init_w)
+        self.log_std = nn.Linear(hidden_size, self.action_dim)
+        self.log_std.weight.data.uniform_(-init_w, init_w)
+        self.log_std.bias.data.uniform_(-init_w, init_w)
+
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
 
         self.reparam_noise = param_noise
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
         self.to(self.device)
-
 
     def forward(self, state):
         x = F.relu(self.linear1(state))
@@ -72,16 +75,17 @@ class SAC_PolicyNetwork(PolicyNetworkBase):
         x = F.relu(self.linear3(x))
 
         mean    = self.mu(x)
-        sigma = self.sigma(x)
-        sigma = T.clamp(sigma, min=self.reparam_noise, max=1)
+        log_std = self.log_std(x)
+        log_std = T.clamp(log_std, self.log_std_min, self.log_std_max)
         
-        return mean, sigma
+        return mean, log_std
     
     def sample_normal(self, state):
         '''
         generate sampled action with state as input wrt the policy network;
         '''
-        mean, std = self.forward(state)
+        mean, log_std = self.forward(state)
+        std = log_std.exp()
         
         normal = Normal(0, 1)
         z = normal.sample(mean.shape)
@@ -109,7 +113,8 @@ class SAC_PolicyNetwork(PolicyNetworkBase):
 
 
 class SAC_PolicyNetworkLSTM(PolicyNetworkBase):
-    def __init__(self, alpha=0.0001, state_dim=50, hidden_size=128, action_dim=4, action_range=1, 
+    def __init__(self, alpha=0.0001, state_dim=50, hidden_size=128, action_dim=4, action_range=1,
+            log_std_min=-20, log_std_max=2, 
             name='policy', chkpt_dir='tmp/', method='', init_w=3e-3, param_noise=1e-6):
         super().__init__(state_dim=state_dim, action_dim=action_dim, name=name, method=method)
 
@@ -125,9 +130,12 @@ class SAC_PolicyNetworkLSTM(PolicyNetworkBase):
         self.mu.weight.data.uniform_(-init_w, init_w)
         self.mu.bias.data.uniform_(-init_w, init_w)
         
-        self.sigma = nn.Linear(hidden_size, self.action_dim)
-        self.sigma.weight.data.uniform_(-init_w, init_w)
-        self.sigma.bias.data.uniform_(-init_w, init_w)
+        self.log_std = nn.Linear(hidden_size, self.action_dim)
+        self.log_std.weight.data.uniform_(-init_w, init_w)
+        self.log_std.bias.data.uniform_(-init_w, init_w)
+
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
 
         self.reparam_noise = param_noise
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
@@ -156,16 +164,17 @@ class SAC_PolicyNetworkLSTM(PolicyNetworkBase):
         x = x.permute(1,0,2)  # permute back
 
         mean    = self.mu(x)
-        sigma = self.sigma(x)
-        sigma = T.clamp(sigma, min=self.reparam_noise, max=1)
+        log_std = self.log_std(x)
+        log_std = T.clamp(log_std, self.log_std_min, self.log_std_max)
         
-        return mean, sigma, lstm_hidden
+        return mean, log_std, lstm_hidden
     
     def sample_normal(self, state, last_action, hidden_in):
         '''
         generate sampled action with state as input wrt the policy network;
         '''
-        mean, std, hidden_out = self.forward(state, last_action, hidden_in)
+        mean, log_std, hidden_out = self.forward(state, last_action, hidden_in)
+        std = log_std.exp()
         
         normal = Normal(0, 1)
         z = normal.sample(mean.shape)
@@ -177,7 +186,7 @@ class SAC_PolicyNetworkLSTM(PolicyNetworkBase):
         # the Normal.log_prob outputs the same dim of input features instead of 1 dim probability,
         # needs sum up across the features dim to get 1 dim prob; or else use Multivariate Normal.
         log_prob = log_prob.sum(dim=-1, keepdim=True)
-        return action, log_prob, hidden_out
+        return action, log_prob
 
     def choose_action(self, state, last_action, hidden_in, deterministic=True):
         state = T.FloatTensor(state).unsqueeze(0).unsqueeze(0).to(self.device)  # increase 2 dims to match with training data
