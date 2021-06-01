@@ -39,9 +39,9 @@ if __name__ == '__main__':
     # Environment
     channel = EngineConfigurationChannel()
     channel.set_configuration_parameters(time_scale = args.ff)
-    environment_name = 'RL_Simulator_paper_nographics'
+    environment_name = 'RL_Simulator_constant'
     unity_env = UnityEnvironment(
-        './unity_environments/RL_Simulator_paper_nographics/RL_Simulator_paper_nographics', 
+        f'./unity_environments/{environment_name}/{environment_name}', 
         side_channels=[channel], no_graphics=True, seed=SEED)
     env = UnityToGymWrapper(unity_env)
 
