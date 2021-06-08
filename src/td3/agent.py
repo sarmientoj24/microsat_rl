@@ -1,5 +1,5 @@
-from src.commons.base_networks import BaseQNetwork
-from src.td3 import PolicyNetwork
+from src.td3.policy_network import PolicyNetwork
+from src.td3.q_network import QNetwork
 from src.commons import ReplayBuffer
 import torch as T
 import torch.nn.functional as F
@@ -9,7 +9,8 @@ import numpy as np
 class Agent():
     def __init__(self, alpha=0.0001, state_dim=50, env=None, gamma=0.995,
             action_dim=4, action_range=1, max_size=1000000, tau=1e-2,
-            hidden_dim=128, batch_size=512, reward_scale=1, policy_target_update_interval=1):
+            hidden_size=128, batch_size=512, reward_scale=1, policy_target_update_interval=1,
+            device='cpu'):
         self.gamma = gamma
         self.tau = tau
         self.alpha = alpha
@@ -19,28 +20,22 @@ class Agent():
         self.action_dim = action_dim
 
         self.policy_net = PolicyNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='policy_net', action_range=action_range, method='td3')
+                    name='policy_net', action_range=action_range, method='td3',
+                    hidden_size=hidden_size, device=device)
         self.target_policy_net = PolicyNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='target_policy_net', action_range=action_range, method='td3')
-        self.q_net1 = BaseQNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='q_net1', method='td3')
-        self.q_net2 = BaseQNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='q_net2', method='td3')
-        self.target_q_net1 = BaseQNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='target_q_net1', method='td3')
-        self.target_q_net2 = BaseQNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='target_q_net2', method='td3')
+                    name='target_policy_net', action_range=action_range, method='td3',
+                    hidden_size=hidden_size, device=device)
+        self.q_net1 = QNetwork(alpha, state_dim, action_dim=action_dim,
+                    name='q_net1', method='td3', hidden_size=hidden_size, device=device)
+        self.q_net2 = QNetwork(alpha, state_dim, action_dim=action_dim,
+                    name='q_net2', method='td3', hidden_size=hidden_size, device=device)
+        self.target_q_net1 = QNetwork(alpha, state_dim, action_dim=action_dim,
+                    name='target_q_net1', method='td3', hidden_size=hidden_size, device=device)
+        self.target_q_net2 = QNetwork(alpha, state_dim, action_dim=action_dim,
+                    name='target_q_net2', method='td3', hidden_size=hidden_size, device=device)
 
         self.reward_scale = reward_scale
-        self.target_q_net1 = self.update_network_parameters(
-            self.q_net1, self.target_q_net1,
-            soft_tau=1
-        )
-
-        self.target_q_net2 = self.update_network_parameters(
-            self.q_net2, self.target_q_net2,
-            soft_tau=1
-        )
+        self.update_network_parameters(1)
 
         self.action_range = action_range
         self.update_cnt = 0
@@ -56,15 +51,36 @@ class Agent():
     def remember(self, state, action, reward, new_state, done):
         self.memory.store_transition(state, action, reward, new_state, done)
 
-    def update_network_parameters(self, net, target_net, soft_tau=None):
-        if soft_tau is None:
-            soft_tau = self.tau
-        for target_param, param in zip(target_net.parameters(), net.parameters()):
-            target_param.data.copy_(
-                target_param.data * (1.0 - soft_tau) + param.data * soft_tau
-            )
+    def update_network_parameters(self, tau=None):
+        if tau is None:
+            tau = self.tau
 
-        return target_net
+        target_params = self.target_q_net1.named_parameters()
+        base_params = self.q_net1.named_parameters()
+        self.target_q_net1.load_state_dict(
+            self.network_update(base_params, target_params, tau)
+        )
+
+        target_params = self.target_q_net2.named_parameters()
+        base_params = self.q_net2.named_parameters()
+        self.target_q_net2.load_state_dict(
+            self.network_update(base_params, target_params, tau)
+        )
+
+        target_params = self.target_policy_net.named_parameters()
+        base_params = self.policy_net.named_parameters()
+        self.target_policy_net.load_state_dict(
+            self.network_update(base_params, target_params, tau)
+        )
+
+    def network_update(self, base_params, target_params, tau):
+        target_dict = dict(target_params)
+        state_dict = dict(base_params)
+
+        for name in state_dict:
+            state_dict[name] = tau*state_dict[name].clone() + \
+                    (1-tau)*target_dict[name].clone()
+        return state_dict
 
     def save_models(self):
         print('.... saving models ....')
@@ -97,7 +113,7 @@ class Agent():
         new_action, log_prob = self.policy_net.sample_normal(state, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
         new_next_action, _ = self.target_policy_net.sample_normal(next_state, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
 
-        reward = self.reward_scale * (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6) # normalize with batch mean and std; plus a small number to prevent numerical problem
+        reward = self.reward_scale * (reward - reward.mean(dim=0)) / ((reward.std(dim=0) + 1e-6)) # normalize with batch mean and std; plus a small number to prevent numerical problem
 
         # Training Q Function
         target_q_min = T.min(self.target_q_net1(next_state, new_next_action),self.target_q_net2(next_state, new_next_action))
@@ -120,10 +136,8 @@ class Agent():
             policy_loss.backward()
             self.policy_net.optimizer.step()
         
-        # Soft update the target nets
-            self.target_q_net1 = self.update_network_parameters(self.q_net1, self.target_q_net1)
-            self.target_q_net2 = self.update_network_parameters(self.q_net2, self.target_q_net2)
-            self.target_policy_net = self.update_network_parameters(self.policy_net, self.target_policy_net)
+            # Soft update the target nets
+            self.update_network_parameters()
 
         self.update_cnt+=1
         

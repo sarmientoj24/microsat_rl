@@ -8,7 +8,6 @@ setup(
     packages=find_namespace_packages(include=["src*"]),
     python_requires="~=3.6.9",
     install_requires=[
-        "numpy~=1.18.5",
         "h5py==2.10.0",
         "cattrs==1.0.0",
         "scipy==1.5.4",
@@ -24,6 +23,7 @@ setup(
         "matplotlib~=3.3.4",
         "wandb~=0.10.31",
         "gdown~=3.13",
-        "numpy~=1.16.4"
+        "numpy~=1.16.4",
+        "omegaconf~=2.1.0"
     ],
 )

@@ -9,9 +9,14 @@ class WandbLogger:
             name=name
         )
 
-    def plot_metrics(self, metric, value):
-        wandb.log({metric: value})
+    def plot_metrics(self, log):
+        wandb.log(log)
     
-    def plot_epoch_loss(self, metric, loss):
+    def plot_epoch_loss(self, metric, loss, episode, step):
         average_loss = np.mean(loss)
-        self.plot_metrics(metric, average_loss)
+        log = {
+            metric: average_loss,
+            'episode': episode,
+            'step': step
+        }
+        self.plot_metrics(log)

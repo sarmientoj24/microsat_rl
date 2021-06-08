@@ -11,10 +11,10 @@ import numpy as np
 '''
 class PolicyNetwork(nn.Module):
     def __init__(self, alpha=0.0001, state_dim=50, action_dim=4, action_range=1, 
-            log_std_min=-20, log_std_max=2, hidden_size=256, init_w=3e-3, 
-            name='policy', chkpt_dir='tmp/', method='sac'):
+            log_std_min=-20, log_std_max=2, hidden_size=128, init_w=3e-3, 
+            name='policy', chkpt_dir='tmp/', method='sac', device='cpu'):
         super(PolicyNetwork, self).__init__()
-
+        hidden_size = 256
         self.name = name
         self.checkpoint_dir = chkpt_dir + method
         self.checkpoint_file = os.path.join(self.checkpoint_dir, name + '_' + method)
@@ -39,7 +39,7 @@ class PolicyNetwork(nn.Module):
         self.log_std_max = log_std_max
 
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
-        self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
+        self.device = device
         self.to(self.device)
 
     def forward(self, state):

@@ -1,0 +1,24 @@
+seed: 42
+environment_name: RL_Simulator_5_min_random
+environment_folder: unity_environments
+no_graphics: True
+fast_forward: 20
+action_dim: 4
+state_dim: 50
+episodes: 17000
+batch_size: 512
+hidden_size: 256
+reward_scale: 10
+figure_folder: plots
+action_range: 1
+save_frequency: 100
+deterministic: False
+
+wandb_log: True
+proj: microsat_17K
+name: sac
+entity: jamesandrewsarmiento
+
+device: cpu
+
+pretrain: False
