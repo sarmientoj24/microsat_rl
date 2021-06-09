@@ -12,7 +12,7 @@ import numpy as np
 class PolicyNetwork(nn.Module):
     def __init__(self, alpha=0.0001, state_dim=50, action_dim=4, action_range=1, 
             log_std_min=-20, log_std_max=2, hidden_size=128, init_w=3e-3, 
-            name='policy', chkpt_dir='tmp/', method='sac', device='cpu'):
+            name='policy', chkpt_dir='./tmp/', method='sac', device='cpu'):
         super(PolicyNetwork, self).__init__()
         hidden_size = 256
         self.name = name

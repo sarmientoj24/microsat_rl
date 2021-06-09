@@ -13,10 +13,10 @@ figure_folder: plots
 action_range: 1
 save_frequency: 100
 deterministic: True
-explore_noise_scale: 0.3
-policy_target_update_interval: 3
+explore_noise_scale: 0.5
+policy_target_update_interval: 1
 update_itr: 1
-eval_noise_scale: 0.3
+eval_noise_scale: 0.5
 
 wandb_log: True
 proj: microsat_17K

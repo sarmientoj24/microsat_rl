@@ -17,6 +17,6 @@ class WandbLogger:
         log = {
             metric: average_loss,
             'episode': episode,
-            'step': step
+            'timestep': step
         }
         self.plot_metrics(log)

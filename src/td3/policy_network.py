@@ -13,8 +13,8 @@ import numpy as np
 class PolicyNetwork(nn.Module):
     def __init__(self, alpha=0.0001, state_dim=50, action_dim=4, action_range=1, 
             log_std_min=-20, log_std_max=2, hidden_size=128, init_w=3e-3, 
-            name='policy', chkpt_dir='tmp/', method='td3', device='cpu'):
-        super(BasePolicyNetwork, self).__init__()
+            name='policy', chkpt_dir='./tmp/', method='td3', device='cpu'):
+        super(PolicyNetwork, self).__init__()
 
         self.name = name
         self.checkpoint_dir = chkpt_dir + method

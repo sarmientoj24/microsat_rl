@@ -7,7 +7,7 @@ from gym import wrappers
 from gym_unity.envs import UnityToGymWrapper
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
-from src.commons import plot_learning_curve, NormalizedActions, set_seed_everywhere, WandbLogger, get_yaml_args, get_remaining_time
+from src.commons import NormalizedActions, set_seed_everywhere, WandbLogger, get_yaml_args, get_remaining_time
 from src.td3 import Agent
 
 
@@ -23,6 +23,8 @@ if __name__ == '__main__':
     environment_name = conf.environment_name
     fast_forward = conf.fast_forward
     environment_folder = conf.environment_folder
+
+    deterministic = conf.deterministic
 
     action_dim = conf.action_dim
     state_dim  = conf.state_dim
@@ -110,9 +112,9 @@ if __name__ == '__main__':
                         eval_noise_scale=eval_noise_scale
                     )
 
-                # Log losses
-                if p_:
-                    policy_losses.append(p_.detach().cpu().numpy())
+                    # Log losses
+                    if p_:
+                        policy_losses.append(p_.detach().cpu().numpy())
                     q1_losses.append(q1_.detach().cpu().numpy())
                     q2_losses.append(q2_.detach().cpu().numpy())
 
@@ -122,7 +124,7 @@ if __name__ == '__main__':
 
             if conf.wandb_log:
                 LOGGER.plot_metrics({
-                        'reward': reward,
+                        'cumulative_reward': score,
                         'episode': episode,
                         'timestep': timestep
                     })
