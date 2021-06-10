@@ -6,21 +6,21 @@ fast_forward: 20
 action_dim: 4
 state_dim: 50
 episodes: 2000
-batch_size: 512
-hidden_size: 256
+batch_size: 64
+hidden_size: 128
 reward_scale: 10
 figure_folder: plots
 action_range: 1
 save_frequency: 100
 deterministic: True
 explore_noise_scale: 0.5
-policy_target_update_interval: 3
+policy_target_update_interval: 5
 update_itr: 1
 eval_noise_scale: 0.5
 
-wandb_log: True
+wandb_log: False
 proj: test_final
-name: td3_BN
+name: td3_lstm
 entity: jamesandrewsarmiento
 
 device: cpu

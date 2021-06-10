@@ -1,6 +1,6 @@
-from src.td3.policy_network import PolicyNetwork
-from src.td3.q_network import QNetwork
-from src.commons import ReplayBuffer
+from src.td3_lstm.policy_network import PolicyNetworkLSTM
+from src.td3_lstm.q_network import QNetworkLSTM
+from src.commons import ReplayBufferLSTM2 as ReplayBuffer
 import torch as T
 import torch.nn.functional as F
 import numpy as np
@@ -15,24 +15,24 @@ class Agent():
         self.tau = tau
         self.alpha = alpha
 
-        self.memory = ReplayBuffer(max_size, state_dim, action_dim)
+        self.memory = ReplayBuffer(max_size)
         self.batch_size = batch_size
         self.action_dim = action_dim
 
-        self.policy_net = PolicyNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='policy_net', action_range=action_range, method='td3',
+        self.policy_net = PolicyNetworkLSTM(alpha, state_dim, action_dim=action_dim,
+                    name='policy_net', action_range=action_range, method='td3_lstm',
                     hidden_size=hidden_size, device=device)
-        self.target_policy_net = PolicyNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='target_policy_net', action_range=action_range, method='td3',
+        self.target_policy_net = PolicyNetworkLSTM(alpha, state_dim, action_dim=action_dim,
+                    name='target_policy_net', action_range=action_range, method='td3_lstm',
                     hidden_size=hidden_size, device=device)
-        self.q_net1 = QNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='q_net1', method='td3', hidden_size=hidden_size, device=device)
-        self.q_net2 = QNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='q_net2', method='td3', hidden_size=hidden_size, device=device)
-        self.target_q_net1 = QNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='target_q_net1', method='td3', hidden_size=hidden_size, device=device)
-        self.target_q_net2 = QNetwork(alpha, state_dim, action_dim=action_dim,
-                    name='target_q_net2', method='td3', hidden_size=hidden_size, device=device)
+        self.q_net1 = QNetworkLSTM(alpha, state_dim, action_dim=action_dim,
+                    name='q_net1', method='td3_lstm', hidden_size=hidden_size, device=device)
+        self.q_net2 = QNetworkLSTM(alpha, state_dim, action_dim=action_dim,
+                    name='q_net2', method='td3_lstm', hidden_size=hidden_size, device=device)
+        self.target_q_net1 = QNetworkLSTM(alpha, state_dim, action_dim=action_dim,
+                    name='target_q_net1', method='td3_lstm', hidden_size=hidden_size, device=device)
+        self.target_q_net2 = QNetworkLSTM(alpha, state_dim, action_dim=action_dim,
+                    name='target_q_net2', method='td3_lstm', hidden_size=hidden_size, device=device)
 
         self.reward_scale = reward_scale
         self.update_network_parameters(1)
@@ -41,12 +41,9 @@ class Agent():
         self.update_cnt = 0
         self.policy_target_update_interval = policy_target_update_interval
 
-    def choose_action(self, state, deterministic=True, explore_noise_scale=0.5):
-        if self.memory.mem_cntr < self.batch_size:
-            return self.policy_net.sample_action()
-        else:
-            return self.policy_net.choose_action(
-                state, deterministic=deterministic, explore_noise_scale=explore_noise_scale)
+    def choose_action(self, state, last_action, hidden_in, explore_noise_scale=0.5):
+        return self.policy_net.choose_action(
+                state, last_action, hidden_in, explore_noise_scale=explore_noise_scale)
 
     def remember(self, state, action, reward, new_state, done):
         self.memory.store_transition(state, action, reward, new_state, done)
@@ -100,44 +97,52 @@ class Agent():
         self.q_net1.load_checkpoint()
         self.q_net2.load_checkpoint()
 
-    def learn(self, eval_noise_scale, deterministic=True, debug=False):
-        state, action, reward, new_state, done = \
-                self.memory.sample_buffer(self.batch_size)
+    def learn(self, eval_noise_scale=1.0, deterministic=True, debug=False):
+        hidden_in, hidden_out, state, action, last_action, reward, next_state, done \
+            = self.memory.sample(self.batch_size)
 
-        reward = T.tensor(reward, dtype=T.float).unsqueeze(1).to(self.policy_net.device)
-        done = T.tensor(np.float32(done)).unsqueeze(1).to(self.policy_net.device)
-        next_state = T.tensor(new_state, dtype=T.float).to(self.policy_net.device)
-        state = T.tensor(state, dtype=T.float).to(self.policy_net.device)
-        action = T.tensor(action, dtype=T.float).to(self.policy_net.device)
+        state      = T.FloatTensor(state).to(self.policy_net.device)
+        next_state = T.FloatTensor(next_state).to(self.policy_net.device)
+        action     = T.FloatTensor(action).to(self.policy_net.device)
+        last_action = T.FloatTensor(last_action).to(self.policy_net.device)
+        reward     = T.FloatTensor(reward).unsqueeze(-1).to(self.policy_net.device)  
+        done       = T.FloatTensor(np.float32(done)).unsqueeze(-1).to(self.policy_net.device)
 
-        predicted_q_value1 = self.q_net1(state, action)
-        predicted_q_value2 = self.q_net2(state, action)
-        new_action, log_prob = self.policy_net.sample_normal(state, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
-        new_next_action, _ = self.target_policy_net.sample_normal(next_state, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
-
-        reward = self.reward_scale * (reward - reward.mean(dim=0)) / ((reward.std(dim=0) + 1e-6)) # normalize with batch mean and std; plus a small number to prevent numerical problem
+        predicted_q_value1, _ = self.q_net1(state, action, last_action, hidden_in)
+        predicted_q_value2, _ = self.q_net2(state, action, last_action, hidden_in)
+        new_action,  _= self.policy_net.evaluate(state, last_action, hidden_in, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
+        new_next_action, _ = self.target_policy_net.evaluate(next_state, action, hidden_out, eval_noise_scale=eval_noise_scale) # clipped normal noise
+        
+        reward = self.reward_scale * (reward - reward.mean(dim=0)) / (reward.std(dim=0) + 1e-6) # normalize with batch mean and std; plus a small number to prevent numerical problem
 
         # Training Q Function
-        target_q_min = T.min(self.target_q_net1(next_state, new_next_action),self.target_q_net2(next_state, new_next_action))
+        predicted_target_q1, _ = self.target_q_net1(next_state, new_next_action, action, hidden_out)
+        predicted_target_q2, _ = self.target_q_net2(next_state, new_next_action, action, hidden_out)
+        target_q_min = T.min(predicted_target_q1, predicted_target_q2)
+
         target_q_value = reward + (1 - done) * self.gamma * target_q_min # if done==1, only reward
+
         q_value_loss1 = ((predicted_q_value1 - target_q_value.detach())**2).mean()  # detach: no gradients for the variable
-        q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()
+        q_value_loss2 = ((predicted_q_value2 - target_q_value.detach())**2).mean()         
         self.q_net1.optimizer.zero_grad()
         q_value_loss1.backward()
         self.q_net1.optimizer.step()
         self.q_net2.optimizer.zero_grad()
         q_value_loss2.backward()
         self.q_net2.optimizer.step()
-
+        
         policy_loss = None
         if self.update_cnt % self.policy_target_update_interval == 0:
-        # Training Policy Function
-            predicted_new_q_value = self.q_net1(state, new_action)
+            # Training Policy Function
+            ''' implementation 1 '''
+            # predicted_new_q_value = torch.min(self.q_net1(state, new_action),self.q_net2(state, new_action))
+            ''' implementation 2 '''
+            predicted_new_q_value, _ = self.q_net1(state, new_action, last_action, hidden_in)
+
             policy_loss = - predicted_new_q_value.mean()
             self.policy_net.optimizer.zero_grad()
             policy_loss.backward()
             self.policy_net.optimizer.step()
-        
             # Soft update the target nets
             self.update_network_parameters()
 
