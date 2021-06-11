@@ -1,0 +1,28 @@
+seed: 42
+environment_name: RL_Simulator_5min_random
+environment_folder: unity_environments
+no_graphics: True
+fast_forward: 20
+action_dim: 4
+state_dim: 50
+episodes: 17000
+batch_size: 512
+hidden_size: 256
+reward_scale: 10
+figure_folder: plots
+action_range: 1
+save_frequency: 100
+deterministic: True
+explore_noise_scale: 0.5
+policy_target_update_interval: 3
+update_itr: 1
+eval_noise_scale: 0.5
+
+wandb_log: True
+proj: microsat_17K
+name: td3_per
+entity: jamesandrewsarmiento
+
+device: cpu
+
+pretrain: False

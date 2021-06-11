@@ -1,6 +1,6 @@
 from src.td3.policy_network import PolicyNetwork
 from src.td3.q_network import QNetwork
-from src.commons import ReplayBuffer
+from src.commons import PrioritizedReplayBuffer
 import torch as T
 import torch.nn.functional as F
 import numpy as np
@@ -10,12 +10,12 @@ class Agent():
     def __init__(self, alpha=0.0001, state_dim=50, env=None, gamma=0.995,
             action_dim=4, action_range=1, max_size=1000000, tau=1e-2,
             hidden_size=128, batch_size=512, reward_scale=1, policy_target_update_interval=1,
-            device='cpu', method='td3'):
+            device='cpu', method='td3_per'):
         self.gamma = gamma
         self.tau = tau
         self.alpha = alpha
 
-        self.memory = ReplayBuffer(max_size, state_dim, action_dim)
+        self.memory = PrioritizedReplayBuffer(max_size, (state_dim,), (action_dim,))
         self.batch_size = batch_size
         self.action_dim = action_dim
 
@@ -42,7 +42,7 @@ class Agent():
         self.policy_target_update_interval = policy_target_update_interval
 
     def choose_action(self, state, deterministic=True, explore_noise_scale=0.5):
-        if self.memory.mem_cntr < self.batch_size:
+        if len(self.memory) < self.batch_size:
             return self.policy_net.sample_action()
         else:
             return self.policy_net.choose_action(
@@ -101,14 +101,15 @@ class Agent():
         self.q_net2.load_checkpoint()
 
     def learn(self, eval_noise_scale, deterministic=True, debug=False):
-        state, action, reward, new_state, done = \
-                self.memory.sample_buffer(self.batch_size)
+        batch, imp_weights, priority_idxs = self.memory.sample(self.batch_size)
+        imp_weights = imp_weights.to(self.policy_net.device)
 
-        reward = T.tensor(reward, dtype=T.float).unsqueeze(1).to(self.policy_net.device)
-        done = T.tensor(np.float32(done)).unsqueeze(1).to(self.policy_net.device)
-        next_state = T.tensor(new_state, dtype=T.float).to(self.policy_net.device)
-        state = T.tensor(state, dtype=T.float).to(self.policy_net.device)
-        action = T.tensor(action, dtype=T.float).to(self.policy_net.device)
+        state, action, reward, new_state, done = batch
+        reward = reward.to(self.policy_net.device)
+        done = done.to(self.policy_net.device)
+        next_state = new_state.to(self.policy_net.device)
+        state = state.to(self.policy_net.device)
+        action = action.to(self.policy_net.device)
 
         predicted_q_value1 = self.q_net1(state, action)
         predicted_q_value2 = self.q_net2(state, action)
@@ -142,6 +143,51 @@ class Agent():
             self.update_network_parameters()
 
         self.update_cnt+=1
+        
+        if debug:
+            print('q loss: ', q_value_loss1, q_value_loss2)
+        return (q_value_loss1, q_value_loss2, policy_loss)
+
+        predicted_q_value1 = self.q_net1(state, action)
+        predicted_q_value2 = self.q_net2(state, action)
+        new_action, log_prob = self.policy_net.sample_normal(state, deterministic, eval_noise_scale=0.0)  # no noise, deterministic policy gradients
+        new_next_action, _ = self.target_policy_net.sample_normal(next_state, deterministic, eval_noise_scale=eval_noise_scale) # clipped normal noise
+
+        reward = self.reward_scale * (reward - reward.mean(dim=0)) / ((reward.std(dim=0) + 1e-6)) # normalize with batch mean and std; plus a small number to prevent numerical problem
+
+        # Training Q Function
+        target_q_min = T.min(self.target_q_net1(next_state, new_next_action),self.target_q_net2(next_state, new_next_action))
+        target_q_value = reward + (1 - done) * self.gamma * target_q_min # if done==1, only reward
+
+
+        # td_error
+        td_error1 = predicted_q_value1 - target_q_value.detach()
+        q_value_loss1 = (imp_weights * (predicted_q_value1 - target_q_value.detach())**2).mean()  # detach: no gradients for the variable
+        q_value_loss2 = (imp_weights * (predicted_q_value2 - target_q_value.detach())**2).mean()
+        self.q_net1.optimizer.zero_grad()
+        q_value_loss1.backward()
+        self.q_net1.optimizer.step()
+        self.q_net2.optimizer.zero_grad()
+        q_value_loss2.backward()
+        self.q_net2.optimizer.step()
+
+        policy_loss = None
+        if self.update_cnt % self.policy_target_update_interval == 0:
+        # Training Policy Function
+            predicted_new_q_value = self.q_net1(state, new_action)
+            policy_loss = - predicted_new_q_value.mean()
+            self.policy_net.optimizer.zero_grad()
+            policy_loss.backward()
+            self.policy_net.optimizer.step()
+        
+            # Soft update the target nets
+            self.update_network_parameters()
+
+        self.update_cnt+=1
+
+        # Update priority errors
+        new_priorities = (abs(td_error1) + 1e-5).cpu().detach().squeeze(1).numpy()
+        self.memory.update_priorities(priority_idxs, new_priorities)
         
         if debug:
             print('q loss: ', q_value_loss1, q_value_loss2)
