@@ -74,6 +74,7 @@ if __name__ == '__main__':
         action_range=action_range, 
         reward_scale=reward_scale,
         device=device,
+        method=method,
         policy_target_update_interval=policy_target_update_interval
     )
     
