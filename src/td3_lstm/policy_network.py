@@ -20,14 +20,13 @@ class PolicyNetworkLSTM(nn.Module):
         self.checkpoint_dir = chkpt_dir + method
         self.checkpoint_file = os.path.join(self.checkpoint_dir, name + '_' + method)
         
-        self.fc1 = nn.Linear(state_dim, hidden_size)
-        self.fc2 = nn.Linear(state_dim + action_dim, hidden_size)
+        self.fc1 = nn.Linear(state_dim + action_dim, hidden_size)
         self.lstm1 = nn.LSTM(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(2*hidden_size, hidden_size)
-        self.fc4 = nn.Linear(hidden_size, action_dim) # output dim = dim of action
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, action_dim) # output dim = dim of action
 
-        self.fc4.weight.data.uniform_(-init_w, init_w)
-        self.fc4.bias.data.uniform_(-init_w, init_w)
+        self.fc3.weight.data.uniform_(-init_w, init_w)
+        self.fc3.bias.data.uniform_(-init_w, init_w)
 
         # Range of 4 actions are already normalized [-1, 1]
         self.action_range = action_range
@@ -47,17 +46,13 @@ class PolicyNetworkLSTM(nn.Module):
         """
         state = state.permute(1,0,2)
         last_action = last_action.permute(1,0,2)
-        # branch 1
-        fc_branch = F.relu(self.fc1(state)) 
-        # branch 2
-        lstm_branch = T.cat([state, last_action], -1)
-        lstm_branch = F.relu(self.fc2(lstm_branch))   # lstm_branch: sequential data
+
+        x = T.cat([state, last_action], -1)
+        x = F.relu(self.fc1(x))   # lstm_branch: sequential data
         # hidden only for initialization, later on hidden states are passed automatically for sequential data
-        lstm_branch,  lstm_hidden = self.lstm1(lstm_branch, hidden_in)    # no activation after lstm
-        # merged
-        merged_branch = T.cat([fc_branch, lstm_branch], -1)   
-        x = F.relu(self.fc3(merged_branch))
-        x = T.tanh(self.fc4(x))
+        x,  lstm_hidden = self.lstm1(x, hidden_in)    # no activation after lstm
+        x = F.relu(self.fc2(x))
+        x = T.tanh(self.fc3(x))
         x = x.permute(1,0,2)  # permute back
 
         return x, lstm_hidden    # lstm_hidden is actually tuple: (hidden, cell)
