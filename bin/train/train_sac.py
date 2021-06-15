@@ -36,6 +36,9 @@ if __name__ == '__main__':
     hidden_size = conf.hidden_size
     reward_scale = conf.reward_scale
     action_range = conf.action_range
+    critic_lr = conf.critic_lr
+    actor_lr = conf.policy_lr
+    alpha_term = conf.alpha_term
 
     # Device
     if conf.device == 'cpu':
@@ -70,7 +73,11 @@ if __name__ == '__main__':
         action_dim=action_dim, 
         action_range=action_range, 
         reward_scale=reward_scale,
-        device=device
+        device=device,
+        method=method,
+        policy_lr=policy_lr,
+        critic_lr=critic_lr,
+        alpha_term=alpha_term
     )
     
     if conf.pretrain:

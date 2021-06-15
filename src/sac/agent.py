@@ -7,9 +7,9 @@ import torch.nn.functional as F
 import numpy as np
 
 class Agent():
-    def __init__(self, alpha=0.0001, state_dim=50, env=None, gamma=0.995,
+    def __init__(self, policy_lr=0.0001, critic_lr=0.0001, state_dim=50, env=None, gamma=0.995,
             action_dim=4, action_range=1, max_size=1000000, tau=1e-2,
-            hidden_size=128, batch_size=512, reward_scale=1, device='cpu'):
+            hidden_size=128, batch_size=512, reward_scale=1, device='cpu', method='sac'):
         self.gamma = gamma
         self.tau = tau
         self.alpha = alpha
@@ -17,17 +17,17 @@ class Agent():
         self.batch_size = batch_size
         self.action_dim = action_dim
 
-        self.policy_net = PolicyNetwork(alpha, state_dim=state_dim, action_dim=action_dim,
-                    name='policy_net', action_range=action_range,
+        self.policy_net = PolicyNetwork(alpha=policy_lr, state_dim=state_dim, action_dim=action_dim,
+                    name='policy_net', action_range=action_range, method=method,
                     hidden_size=hidden_size, device=device)
-        self.q_net1 = QNetwork(alpha, state_dim=state_dim, action_dim=action_dim,
-                    name='q_net1', hidden_size=hidden_size, device=device)
-        self.q_net2 = QNetwork(alpha, state_dim=state_dim, action_dim=action_dim,
-                    name='q_net2', hidden_size=hidden_size, device=device)
-        self.value_net = ValueNetwork(alpha, state_dim=state_dim, name='value',
-                    hidden_size=hidden_size, device=device)
-        self.target_value_net = ValueNetwork(alpha, state_dim=state_dim, name='target_value',
-                    hidden_size=hidden_size, device=device)
+        self.q_net1 = QNetwork(alpha=critic_lr, state_dim=state_dim, action_dim=action_dim,
+                    name='q_net1', hidden_size=hidden_size,  method=method, device=device)
+        self.q_net2 = QNetwork(alpha=critic_lr, state_dim=state_dim, action_dim=action_dim,
+                    name='q_net2', hidden_size=hidden_size,  method=method, device=device)
+        self.value_net = ValueNetwork(alpha=critic_lr, state_dim=state_dim, name='value',
+                    hidden_size=hidden_size,  method=method, device=device)
+        self.target_value_net = ValueNetwork(alpha=critic_lr, state_dim=state_dim, name='target_value',
+                    hidden_size=hidden_size,  method=method, device=device)
 
         self.reward_scale = reward_scale
         self.update_network_parameters(1)

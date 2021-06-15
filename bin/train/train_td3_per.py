@@ -39,6 +39,8 @@ if __name__ == '__main__':
     policy_target_update_interval = conf.policy_target_update_interval
     update_itr = conf.update_itr
     eval_noise_scale = conf.eval_noise_scale
+    critic_lr = conf.critic_lr
+    actor_lr = conf.policy_lr
 
     # Device
     if conf.device == 'cpu':
@@ -75,7 +77,9 @@ if __name__ == '__main__':
         reward_scale=reward_scale,
         device=device,
         policy_target_update_interval=policy_target_update_interval,
-        method=method
+        method=method,
+        policy_lr=policy_lr,
+        critic_lr=critic_lr
     )
     
     if conf.pretrain:
