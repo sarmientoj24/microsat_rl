@@ -13,7 +13,6 @@ class Agent():
             device='cpu', method='td3_per'):
         self.gamma = gamma
         self.tau = tau
-        self.alpha = alpha
 
         self.memory = PrioritizedReplayBuffer(max_size, (state_dim,), (action_dim,))
         self.batch_size = batch_size

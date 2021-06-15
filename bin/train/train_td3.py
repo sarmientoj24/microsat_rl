@@ -40,7 +40,7 @@ if __name__ == '__main__':
     update_itr = conf.update_itr
     eval_noise_scale = conf.eval_noise_scale
     critic_lr = conf.critic_lr
-    actor_lr = conf.policy_lr
+    policy_lr = conf.policy_lr
 
     # Device
     if conf.device == 'cpu':

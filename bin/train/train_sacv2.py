@@ -9,11 +9,11 @@ from gym_unity.envs import UnityToGymWrapper
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 from src.commons import NormalizedActions, set_seed_everywhere, WandbLogger, get_yaml_args, get_remaining_time
-from src.sac import Agent
+from src.sacv2 import Agent
 
 
 if __name__ == '__main__':
-    method = 'sac'
+    method = 'sacv2'
     mode = 'train'
 
     conf = get_yaml_args(method, mode)
@@ -38,7 +38,9 @@ if __name__ == '__main__':
     action_range = conf.action_range
     critic_lr = conf.critic_lr
     policy_lr = conf.policy_lr
-    alpha_term = conf.alpha_term
+    target_entropy = conf.target_entropy
+    target_entropy = target_entropy * action_dim
+    auto_entropy = conf.auto_entropy
 
     # Device
     if conf.device == 'cpu':
@@ -76,8 +78,7 @@ if __name__ == '__main__':
         device=device,
         method=method,
         policy_lr=policy_lr,
-        critic_lr=critic_lr,
-        alpha_term=alpha_term
+        critic_lr=critic_lr
     )
     
     if conf.pretrain:
@@ -96,19 +97,21 @@ if __name__ == '__main__':
             score = 0
 
             epoch_time = time.time()
-            policy_losses, value_losses, q1_losses, q2_losses = [], [], [], []
+            policy_losses, alpha_losses, q1_losses, q2_losses = [], [], [], []
             while not done:
                 timestep += 1
-                action = agent.choose_action(observation)
+                action = agent.choose_action(observation, deterministic=deterministic)
                 observation_, reward, done, info = env.step(action)
                 score += reward
+
                 agent.remember(observation, action, reward, observation_, done)
                 if agent.memory.mem_cntr > agent.batch_size:
-                    v_, q1_, q2_, p_ = agent.learn(debug=False)
+                    a_, q1_, q2_, p_ = agent.learn(
+                        debug=False, auto_entropy=auto_entropy, target_entropy=target_entropy)
 
                     # Log losses
                     policy_losses.append(p_.detach().cpu().numpy())
-                    value_losses.append(v_.detach().cpu().numpy())
+                    alpha_losses.append(a_.detach().cpu().numpy())
                     q1_losses.append(q1_.detach().cpu().numpy())
                     q2_losses.append(q2_.detach().cpu().numpy())
 
@@ -130,7 +133,7 @@ if __name__ == '__main__':
                 LOGGER.plot_epoch_loss(
                     'policy_epoch_loss_ave', policy_losses, episode, timestep)
                 LOGGER.plot_epoch_loss(
-                    'value_epoch_loss_ave', value_losses, episode, timestep)
+                    'alpha_epoch_loss_ave', alpha_losses, episode, timestep)
                 LOGGER.plot_epoch_loss(
                     'q1_epoch_loss_ave', q1_losses, episode, timestep)
                 LOGGER.plot_epoch_loss(
