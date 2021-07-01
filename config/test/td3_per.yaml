@@ -1,0 +1,30 @@
+seed: 24
+environment_name: RL_Simulator_fixed_foreval_gencsv_new_v2
+environment_folder: unity_environments
+no_graphics: False
+fast_forward: 1
+action_dim: 4
+state_dim: 50
+episodes: 5
+batch_size: 512
+hidden_size: 256
+reward_scale: 10
+figure_folder: plots
+action_range: 1
+save_frequency: 100
+deterministic: True
+explore_noise_scale: 0.0
+policy_target_update_interval: 1
+update_itr: 1
+eval_noise_scale: 0.0
+policy_lr: 0.0001
+critic_lr: 0.0001
+
+wandb_log: False
+proj: test_final
+name: td3
+entity: jamesandrewsarmiento
+
+device: cpu
+
+pretrain: True
