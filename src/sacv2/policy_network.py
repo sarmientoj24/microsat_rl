@@ -81,7 +81,7 @@ class PolicyNetwork(nn.Module):
         T.save(self.state_dict(), self.checkpoint_file)
 
     def load_checkpoint(self):
-        self.load_state_dict(T.load(self.checkpoint_file))
+        self.load_state_dict(T.load(self.checkpoint_file, map_location=T.device(self.device)))
 
     def choose_action(self, state, deterministic=False):
         state = T.FloatTensor(state).unsqueeze(0).to(self.device)
@@ -89,8 +89,8 @@ class PolicyNetwork(nn.Module):
         
         normal = Normal(0, 1)
         z      = normal.sample(mean.shape).to(self.device)
-        action = self.action_range * T.tanh(mean + std*z)        
-        action = T.tanh(mean).detach().cpu().numpy()[0] if deterministic else action.detach().cpu().numpy()[0]
+        action = self.action_range * T.tanh(mean + std*z)
+        action = T.tanh(mean).detach().cpu().numpy()[0] if deterministic else action.detach().cpu().numpy()
         
         return action
 

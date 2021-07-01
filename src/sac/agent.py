@@ -9,7 +9,7 @@ import numpy as np
 class Agent():
     def __init__(self, policy_lr=0.0001, critic_lr=0.0001, state_dim=50, env=None, gamma=0.995,
             action_dim=4, action_range=1, max_size=1000000, tau=1e-2,
-            hidden_size=128, batch_size=512, reward_scale=1, device='cpu', method='sac'):
+            hidden_size=128, batch_size=512, reward_scale=1, device='cpu', method='sac', alpha_term=1.0):
         self.gamma = gamma
         self.tau = tau
         self.memory = ReplayBuffer(max_size, state_dim, action_dim)
@@ -33,11 +33,13 @@ class Agent():
 
         self.action_range = action_range
 
-    def choose_action(self, state, deterministic=False):
+    def choose_action(self, state, deterministic=False, test=False):
+        if test:
+            return self.policy_net.choose_action(state, deterministic=deterministic)
         if self.memory.mem_cntr < self.batch_size:
             return self.policy_net.sample_action()
         else:
-            return self.policy_net.choose_action(state)
+            return self.policy_net.choose_action(state, deterministic=deterministic)
 
     def remember(self, state, action, reward, new_state, done):
         self.memory.store_transition(state, action, reward, new_state, done)

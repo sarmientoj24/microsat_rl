@@ -81,7 +81,8 @@ class PolicyNetwork(nn.Module):
         T.save(self.state_dict(), self.checkpoint_file)
 
     def load_checkpoint(self):
-        self.load_state_dict(T.load(self.checkpoint_file))
+        self.load_state_dict(T.load(self.checkpoint_file, map_location=T.device(self.device)))
+        self.eval()
 
     def choose_action(self, state, deterministic=False):
         state = T.FloatTensor(state).unsqueeze(0).to(self.device)

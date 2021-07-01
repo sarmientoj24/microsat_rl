@@ -37,7 +37,9 @@ class Agent():
         self.alpha_lr = alpha_lr
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
-    def choose_action(self, state, deterministic=False):
+    def choose_action(self, state, deterministic=False, test=False):
+        if test:
+            return self.policy_net.choose_action(state, deterministic=deterministic)
         if self.memory.mem_cntr < self.batch_size:
             return self.policy_net.sample_action()
         else:

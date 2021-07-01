@@ -40,7 +40,10 @@ class Agent():
         self.update_cnt = 0
         self.policy_target_update_interval = policy_target_update_interval
 
-    def choose_action(self, state, deterministic=True, explore_noise_scale=0.5):
+    def choose_action(self, state, deterministic=True, explore_noise_scale=0.5, test=False):
+        if test:
+            return self.policy_net.choose_action(
+                state, deterministic=deterministic, explore_noise_scale=explore_noise_scale)
         if self.memory.mem_cntr < self.batch_size:
             return self.policy_net.sample_action()
         else:
@@ -93,7 +96,7 @@ class Agent():
     def load_models(self):
         print('.... loading models ....')
         self.policy_net.load_checkpoint()
-        self.target_policy_net.load_checkpoint()
+        # self.target_policy_net.load_checkpoint()
         self.target_q_net1.load_checkpoint()
         self.target_q_net2.load_checkpoint()
         self.q_net1.load_checkpoint()
