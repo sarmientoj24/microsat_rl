@@ -1,6 +1,21 @@
 # CS295 Reinforcement Learning Mini Project
 ## Sample Efficient Microsatellite Attitude Control using Deep Reinforcement Learning with Unity and OpenAI Gym
 
+## Simulation Results
+The following are simulations with a trained agent using the listed methods below. Training session lasted for 17K episodes (5.1M timesteps) in about 2 full days.
+
+### Soft-Actor Critic V1 SACv1)
+![SAC](./imgs/sacv1.gif)
+
+### Twin-Delayed DDPG (TD3)
+![SAC](./imgs/td3.gif)
+
+### Soft-Actor Critic V2 (SACv2)
+![SAC](./imgs/sacv2.gif)
+
+### TD3 with Prioritized Experience Replay (TD3-PER)
+![SAC](./imgs/td3_per.gif)
+
 ## Setting up dependencies
 1. Create a virtualenvironment (or use Pytorch Docker)  
    ```
